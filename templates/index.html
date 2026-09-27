@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width,initial-scale=1" />
+ <title>SQLite3 CGI データベース選択</title>
+ <!-- BootstrapのCSS読み込み -->
+ <link href="https://cdn.jsdelivr.net/npm/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+ <!-- JS365Lib.js の読み込み -->
+ <script src="/js/JS365Lib3.js"></script>
+ <!-- CSS -->
+ <style> </style>
+ <!-- JavaScript -->
+ <script>
+   const PREFIX = "SQLite3_";
+   const FORCECLEAR = false;  // すべての localStorage のキーを削除。(デバッグ用)
+   
+  // 登録済みの DB を listDB に設定する。
+  function recoverListDB() {
+    const dbkeys = getStorageKeys(prefix=PREFIX, session=false);
+    for (const key of dbkeys) {
+      if (key == "currentDB") {
+        const currentDB = getStorageValue(key, PREFIX, session=false);
+        if (currentDB != null)
+          setValue("currentDB", currentDB);
+      }
+      else {
+        const db = getStorageValue(key, PREFIX, session=false);
+        if (db != null)
+          insertHTML(listDB, `<option>${db}</option>\n`, 2);
+      }
+    }
+  }
+  
+  // ページがロードされたとき
+  window.onload = (event) => {
+    // 登録済みの DB を listDB に設定する。
+    recoverListDB();
+    // 選択ボタンがクリックされたとき
+    clickEvent("selectDBclick", () => {
+      let dbpath = getValue("currentDB");
+      if (dbpath == "" || dbpath == null) {
+        alert("null の選択はできません。");
+        return;
+      }
+      if (dbpath.startsWith('"') && dbpath.endsWith('"'))
+        dbpath = dbpath.substring(1, dbpath.length - 1);
+      dbpath = dbpath.replaceAll("\\", "/");
+      setStorageValue("currentDB", dbpath, prefix=PREFIX, session=false);
+      const currentDB = getStorageValue("currentDB", prefix=PREFIX, session=false);
+      setValue("message", `現在の DB が ${currentDB} に設定されました。`);
+      setValue("currentDB", currentDB);
+    });
+    // 登録ボタンがクリックされたとき
+    clickEvent("registerDBclick", () => {
+      const dbpath = getValue("currentDB");
+      if (dbpath == "") {
+        alert("データベースの指定がありません。");
+        return;
+      }
+      const parts = dbpath.split("/");
+      const parts2 = parts[parts.length - 1].split(".");
+      const key = parts2[0];
+      setStorageValue(key, dbpath, prefix=PREFIX, session=false);
+      setValue("message", `現在の DB key="${key}", value="${dbpath}" が履歴リストに登録されました。`);
+    });
+    // クリアボタンがクリックされたとき
+    clickEvent("clearDBclick", () => {
+      if (confirm("すべての履歴がクリアされます。実行しますか？") == false)
+        return;
+      if (FORCECLEAR) {
+        localStorage.clear();
+        setValue("message", "localStorage がクリアされました。リロードすると結果が反映されます。");
+        return;
+      }
+      const keys = getStorageKeys(prefix=PREFIX, session=false);
+      for (const key of keys) {
+         deleteStorageKey(key, prefix=PREFIX, session=false);
+      }
+      setValue("message", "履歴リストがクリアされました。リロードすると結果が反映されます。");
+    });
+    // 削除ボタンがクリックされたとき
+    clickEvent("deleteDBclick", () => {
+      if (confirm("現在の DB が履歴から削除されます。実行しますか？") == false)
+        return;
+      const dbpath = getValue("currentDB");
+      const parts = dbpath.split("/").split(".");
+      const key = parts[0];
+      deleteStoragekey(key, prefix=PREFIX, session=false);
+      setValue("message", `履歴リストからキー ${key} が削除されました。リロードすると結果が反映されます。`);
+    });
+    // 履歴リストセレクタがクリックされたとき
+    clickEvent("listDB", () => {
+       const db = getSelectValue("listDB");
+       if (db == null)
+          return;
+       setValue("currentDB", db);
+    });
+  }
+ </script>
+</head>
+
+<body>
+  <!-- ヘッダー -->
+  <header class="container">
+   <h1 class="header-1 text-primary p-5 text-center">SQLite3 CGI <span style="font-size:18pt;color:brown;">ver2.0</span><br><span style="font-size:20pt;">(データベース選択)</span></h1>
+  </header>
+
+  <!-- アプリ 本体 -->
+  <div id="app" class="container">
+   <!-- メニュー -->
+   <ul class="nav">
+    <li class="nav-item">
+      <a class="nav-link active" aria-current="page" href="/cgi-bin/SQLite3/index.cgi">データベース</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/cgi-bin/SQLite3/tables.cgi">テーブル</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/cgi-bin/SQLite3/indexes.cgi">インデックス</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/cgi-bin/SQLite3/views.cgi">ビュー</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/cgi-bin/SQLite3/query.cgi">クエリー</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="/cgi-bin/SQLite3/command.cgi">コマンド</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="javascript:location.reload()">リロード</a>
+    </li>
+   </ul>
+
+   <!-- 内容 -->
+   <div class="row p-5">
+	<p><b>重要な注意：</b> Linux ではデータベースファイルだけでなく、/home以下のすべての親のフォルダのグループをすべて wwww-data (r/w 権限) に変更する必要がある。</p>
+    <form>
+     <div class="mb-2">
+      <label class="form-label">
+       データベースの選択 <input id="currentDB" type="text" name="currentDB" size="100" class="form-control">
+      </label>
+     </div>
+     <div class="mb-2">
+      <label class="form-label">
+       履歴リスト (登録済みデータベース) <select id="listDB" name="listDB" class="form-select"></select>
+      </label>
+     </div>
+     <div class="mt-2 mb-2">
+      <button id="selectDBclick" type="button" class="btn btn-primary me-2">この DB を選択する</button>
+      <button id="registerDBclick" type="button" class="btn btn-primary me-2">履歴リストに登録する</button>
+      <button id="clearDBclick" type="button" class="btn btn-secondary me-2">履歴リストをクリアする</button>
+      <button id="deleteDBclick" type="button" class="btn btn-secondary me-2">現在の DB を履歴リストから削除する</button>
+     </div>
+     <div id="message" class="mt-4 fs-4" style="color:magenta"></div>
+    </form>
+   </div>
+  </div>
+
+  <!-- フッター -->
+  <footer class="container">
+   <p>&nbsp;</p>
+   <p class="text-center mt-4"><a href="#top">TOP</a></p>
+   <p>&nbsp;</p>
+   <p>&nbsp;</p>
+  </footer>
+  <!-- BootstrapのJS読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
